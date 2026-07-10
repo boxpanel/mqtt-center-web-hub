@@ -45,6 +45,8 @@ class NodePoller {
       this.nodeStates.set(node.id, {
         nodeId: node.id,
         nodeName: node.name,
+        nodeHost: node.host,
+        nodePort: node.port,
         status: 'online',
         clients,
         system,
@@ -56,6 +58,8 @@ class NodePoller {
       this.nodeStates.set(node.id, {
         nodeId: node.id,
         nodeName: node.name,
+        nodeHost: node.host,
+        nodePort: node.port,
         status: 'offline',
         clients: [],
         system: null,
@@ -72,8 +76,56 @@ class NodePoller {
     });
   }
 
+  /**
+   * 处理客户端心跳上报
+   */
+  handleHeartbeat(data) {
+    // 通过 host:port 查找对应的节点状态
+    for (const [nodeId, state] of this.nodeStates) {
+      if (state.nodeHost === data.host && state.nodePort === data.port) {
+        this.nodeStates.set(nodeId, {
+          ...state,
+          status: 'online',
+          stats: data.stats || state.stats,
+          system: data.system || state.system,
+          clients: data.clients || state.clients,
+          lastSeen: new Date().toISOString(),
+          lastHeartbeat: new Date().toISOString(),
+          latency: 0,
+        });
+
+        this._emit({
+          type: 'node:update',
+          data: this.nodeStates.get(nodeId),
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
   async pollAll(nodes) {
     await Promise.allSettled(nodes.map((n) => this.pollNode(n)));
+  }
+
+  /**
+   * 添加新节点到轮询列表并立即轮询一次
+   */
+  async addNode(node) {
+    await this.pollNode(node);
+    // 保存当前节点列表以便后续轮询使用
+    if (!this._nodes) this._nodes = [];
+    this._nodes.push(node);
+  }
+
+  /**
+   * 从轮询列表中移除节点
+   */
+  removeNode(nodeId) {
+    this.nodeStates.delete(nodeId);
+    if (this._nodes) {
+      this._nodes = this._nodes.filter((n) => n.id !== nodeId);
+    }
   }
 
   getNodeState(nodeId) {
@@ -100,9 +152,10 @@ class NodePoller {
 
   start(nodes) {
     if (this.timer) return;
+    this._nodes = nodes;
     logger.info({ interval: POLL_INTERVAL }, '轮询器已启动');
     this.pollAll(nodes);
-    this.timer = setInterval(() => this.pollAll(nodes), POLL_INTERVAL);
+    this.timer = setInterval(() => this.pollAll(this._nodes), POLL_INTERVAL);
   }
 
   stop() {

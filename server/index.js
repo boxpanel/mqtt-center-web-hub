@@ -5,11 +5,12 @@ import { fileURLToPath } from 'url';
 import logger from './logger.js';
 import { loadNodes } from './store.js';
 import { poller } from './poller.js';
+import { searchNodes } from './discovery.js';
 import nodesRouter from './routes/nodes.js';
 import dashboardRouter from './routes/dashboard.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PORT) || 8080;
+const PORT = Number(process.env.PORT) || 80;
 const app = express();
 
 app.use(cors());
@@ -21,6 +22,24 @@ app.use('/api/dashboard', dashboardRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// ── LAN 节点发现 ──
+app.post('/api/discovery/search', async (req, res) => {
+  try {
+    const nodes = await searchNodes(PORT);
+    res.json(nodes);
+  } catch (err) {
+    res.status(500).json({ error: '发现失败' });
+  }
+});
+
+// ── 客户端心跳上报 ──
+app.post('/api/heartbeat', (req, res) => {
+  const { host, port, stats, system, clients } = req.body;
+  if (!host || !port) return res.status(400).json({ error: '缺少 host 或 port' });
+  const updated = poller.handleHeartbeat({ host, port, stats, system, clients });
+  res.json({ success: true, matched: updated });
 });
 
 // ── 静态文件 ──

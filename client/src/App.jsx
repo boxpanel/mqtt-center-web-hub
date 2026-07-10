@@ -1,19 +1,56 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  fetchNodes, addNode, deleteNode,
+  fetchNodes, deleteNode, updateNode, addNode, searchNodes,
   fetchSummary, fetchNodeStates, subscribeEvents,
 } from './api';
 import './App.css';
 
-function StatusDot({ status }) {
-  return <span className={`status-dot`} style={{ background: status === 'connected' ? 'var(--success)' : status === 'disabled' ? 'var(--disabled)' : 'var(--text-muted)' }} />;
+function getBarColor(percent) {
+  if (percent >= 90) return 'var(--danger)';
+  if (percent >= 70) return 'var(--warning)';
+  return 'var(--primary)';
 }
 
-function StatCard({ label, value, colorClass }) {
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const val = bytes / 1024 ** i;
+  return `${val >= 100 ? Math.round(val) : val.toFixed(1)} ${units[i]}`;
+}
+
+function MetricCard({ label, percent, detail }) {
   return (
-    <div className="stat-card">
-      <div className="stat-card-label">{label}</div>
-      <div className={`stat-card-value ${colorClass}`}>{value}</div>
+    <div className="metric-card">
+      <div className="metric-header">
+        <span className="metric-label">{label}</span>
+        <span className="metric-percent" style={{ color: getBarColor(percent) }}>{percent}%</span>
+      </div>
+      <div className="metric-bar">
+        <div className="metric-bar-fill" style={{ width: `${Math.min(percent, 100)}%`, background: getBarColor(percent) }} />
+      </div>
+      <div className="metric-detail">{detail}</div>
+    </div>
+  );
+}
+
+function ClientStatCard({ total, connected, errors }) {
+  return (
+    <div className="metric-card client-stat-card">
+      <div className="stat-rows">
+        <div className="stat-row">
+          <span className="stat-label total">客户端总数</span>
+          <span className="stat-value blue">{total}</span>
+        </div>
+        <div className="stat-row">
+          <span className="stat-label connected">已连接</span>
+          <span className="stat-value green">{connected}</span>
+        </div>
+        <div className="stat-row">
+          <span className="stat-label errors">异常</span>
+          <span className="stat-value red">{errors}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -21,10 +58,16 @@ function StatCard({ label, value, colorClass }) {
 export default function App() {
   const [nodes, setNodes] = useState([]);
   const [nodeStates, setNodeStates] = useState([]);
-  const [summary, setSummary] = useState({ totalNodes: 0, onlineNodes: 0, totalClients: 0, totalConnected: 0, totalDisabled: 0, totalErrors: 0 });
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [summary, setSummary] = useState({ totalClients: 0, totalConnected: 0, totalErrors: 0 });
   const [toast, setToast] = useState(null);
-  const [form, setForm] = useState({ name: '', host: '', port: '8088' });
+  const [editingNode, setEditingNode] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [showingAdd, setShowingAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', host: '', port: '80' });
+  const [discoveredNodes, setDiscoveredNodes] = useState([]);
+  const [selectedDiscovered, setSelectedDiscovered] = useState(new Set());
+  const [searching, setSearching] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const showToast = (msg, isError = false) => {
     setToast({ msg, isError });
@@ -32,10 +75,8 @@ export default function App() {
   };
 
   const loadNodes = useCallback(async () => {
-    try {
-      const data = await fetchNodes();
-      setNodes(data);
-    } catch (err) { showToast(err.message, true); }
+    try { const data = await fetchNodes(); setNodes(data); }
+    catch (err) { showToast(err.message, true); }
   }, []);
 
   useEffect(() => {
@@ -58,32 +99,112 @@ export default function App() {
     return unsub;
   }, [loadNodes]);
 
-  const handleAddNode = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim() || !form.host.trim()) return;
-    try {
-      await addNode(form);
-      showToast('节点已添加');
-      setForm({ name: '', host: '', port: '8088' });
-      loadNodes();
-    } catch (err) { showToast(err.message, true); }
-  };
+  // ── 聚合系统指标 ──
+  const onlineStates = nodeStates.filter((s) => s.status === 'online' && s.system);
+  const avgCpu = onlineStates.length
+    ? Math.round(onlineStates.reduce((s, n) => s + (n.system.cpu?.percent || 0), 0) / onlineStates.length * 10) / 10
+    : 0;
+  const avgMem = onlineStates.length
+    ? Math.round(onlineStates.reduce((s, n) => s + (n.system.memory?.percent || 0), 0) / onlineStates.length * 10) / 10
+    : 0;
+  const avgDisk = onlineStates.length
+    ? Math.round(onlineStates.reduce((s, n) => s + (n.system.disk?.percent || 0), 0) / onlineStates.length * 10) / 10
+    : 0;
+  const totalMem = onlineStates.reduce((s, n) => s + (n.system.memory?.total || 0), 0);
+  const usedMem = onlineStates.reduce((s, n) => s + (n.system.memory?.used || 0), 0);
+  const totalDisk = onlineStates.reduce((s, n) => s + (n.system.disk?.total || 0), 0);
+  const usedDisk = onlineStates.reduce((s, n) => s + (n.system.disk?.used || 0), 0);
 
   const handleDeleteNode = async (id) => {
-    if (!confirm('确定删除该节点？')) return;
+    setDeleteConfirm(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
     try {
-      await deleteNode(id);
+      await deleteNode(deleteConfirm);
       showToast('节点已删除');
-      if (selectedNode?.id === id) setSelectedNode(null);
+      setDeleteConfirm(null);
       loadNodes();
     } catch (err) { showToast(err.message, true); }
   };
 
-  const selectedState = selectedNode
-    ? nodeStates.find((s) => s.nodeId === selectedNode.id)
-    : null;
+  const handleEditNode = (node) => {
+    setEditingNode(node);
+    setEditName(node.name);
+  };
 
-  const selectedClients = selectedState?.clients || [];
+  const saveEditNode = async () => {
+    if (!editName.trim() || editName.trim() === editingNode.name) {
+      setEditingNode(null);
+      return;
+    }
+    try {
+      await updateNode(editingNode.id, { name: editName.trim() });
+      showToast('节点名称已修改');
+      setEditingNode(null);
+      loadNodes();
+    } catch (err) { showToast(err.message, true); }
+  };
+
+  const handleAddNode = async () => {
+    const checked = [...selectedDiscovered].map((i) => discoveredNodes[i]).filter(Boolean);
+    if (checked.length > 0) {
+      // 添加勾选的搜索结果
+      let added = 0;
+      for (const node of checked) {
+        try {
+          await addNode({ name: node.name, host: node.host, port: String(node.port) });
+          added++;
+        } catch { /* 跳过失败 */ }
+      }
+      showToast(`成功添加 ${added} 个节点`);
+      setShowingAdd(false);
+      setDiscoveredNodes([]);
+      setSelectedDiscovered(new Set());
+      loadNodes();
+    } else if (addForm.name.trim() && addForm.host.trim()) {
+      // 手动添加
+      try {
+        await addNode(addForm);
+        showToast('节点已添加');
+        setAddForm({ name: '', host: '', port: '80' });
+        loadNodes();
+      } catch (err) { showToast(err.message, true); }
+    }
+  };
+
+  const handleSearchNodes = async () => {
+    setSearching(true);
+    setDiscoveredNodes([]);
+    setSelectedDiscovered(new Set());
+    try {
+      const nodes = await searchNodes();
+      setDiscoveredNodes(nodes);
+      // 不默认勾选
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDiscovered.size === discoveredNodes.length) {
+      setSelectedDiscovered(new Set());
+    } else {
+      setSelectedDiscovered(new Set(discoveredNodes.map((_, i) => i)));
+    }
+  };
+
+  const toggleDiscovered = (idx) => {
+    setSelectedDiscovered((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
 
   return (
     <div className="app">
@@ -93,145 +214,201 @@ export default function App() {
           <p className="subtitle">总监控平台 · 集中管理所有 MQTT Center 节点</p>
 
           <div className="stats-grid">
-            <StatCard label="节点总数" value={summary.totalNodes} colorClass="blue" />
-            <StatCard label="在线节点" value={summary.onlineNodes} colorClass="green" />
-            <StatCard label="离线节点" value={summary.totalNodes - summary.onlineNodes} colorClass="red" />
-            <StatCard label="客户端总数" value={summary.totalClients} colorClass="blue" />
-            <StatCard label="已连接" value={summary.totalConnected} colorClass="green" />
-            <StatCard label="异常" value={summary.totalErrors} colorClass={summary.totalErrors > 0 ? 'red' : 'muted'} />
+            <MetricCard label="CPU" percent={avgCpu} detail={`${onlineStates.length} 节点平均 · ${avgCpu}%`} />
+            <MetricCard label="内存" percent={avgMem} detail={`${formatBytes(usedMem)} / ${formatBytes(totalMem)}`} />
+            <MetricCard label="存储" percent={avgDisk} detail={`${formatBytes(usedDisk)} / ${formatBytes(totalDisk)}`} />
+            <ClientStatCard total={summary.totalClients} connected={summary.totalConnected} errors={summary.totalErrors} />
           </div>
         </div>
       </header>
+
+      <div className="page-container" style={{ marginTop: 16, marginBottom: 4 }}>
+        <button className="btn btn-primary" onClick={() => setShowingAdd(true)}>+ 节点</button>
+      </div>
 
       <main className="main">
         <div className="page-container">
           <div className="main-row">
             {/* 左侧：节点列表 */}
-            <div className="main-sidebar">
+            <div className="main-sidebar" style={{ width: '100%' }}>
               <div className="panel">
                 <div className="panel-header">节点列表</div>
-                <div className="panel-body">
-                  {nodes.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">📡</div>
-                      <p>暂无节点</p>
-                    </div>
-                  ) : (
-                    nodes.map((node) => {
-                      const state = nodeStates.find((s) => s.nodeId === node.id);
-                      const isOnline = state?.status === 'online';
-                      return (
-                        <div
-                          key={node.id}
-                          className={`node-item ${selectedNode?.id === node.id ? 'active' : ''}`}
-                          onClick={() => setSelectedNode(node)}
-                        >
-                          <span className={`node-dot ${isOnline ? 'online' : 'offline'}`} />
-                          <div className="node-info">
-                            <div className="node-name">{node.name}</div>
-                            <div className="node-addr">{node.host}:{node.port}</div>
-                            {state && (
-                              <div className="node-meta">
-                                {state.stats.total} 客户端 · 延迟 {state.latency}ms
-                              </div>
-                            )}
-                          </div>
-                          <button className="node-del" onClick={(e) => { e.stopPropagation(); handleDeleteNode(node.id); }}>✕</button>
-                        </div>
-                      );
-                    })
-                  )}
-
-                  <form className="add-node-form" onSubmit={handleAddNode}>
-                    <div className="form-row">
-                      <input className="form-input" placeholder="名称" value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                      <input className="form-input" placeholder="地址" value={form.host}
-                        onChange={(e) => setForm({ ...form, host: e.target.value })} required />
-                    </div>
-                    <div className="form-row">
-                      <input className="form-input" placeholder="端口" value={form.port}
-                        onChange={(e) => setForm({ ...form, port: e.target.value })} style={{ width: 100 }} />
-                      <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>+ 添加</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            {/* 右侧：客户端详情 */}
-            <div className="main-content">
-              <div className="panel">
-                <div className="panel-header">
-                  <span>{selectedNode ? `${selectedNode.name} - 客户端列表` : '客户端详情'}</span>
-                  {selectedState && (
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>
-                      {selectedState.nodeName} · {selectedState.latency}ms
-                    </span>
-                  )}
-                </div>
                 <div className="panel-body" style={{ padding: 0 }}>
-                  {!selectedNode ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">👈</div>
-                      <p>请在左侧选择一个节点查看详情</p>
-                    </div>
-                  ) : selectedState?.status === 'offline' ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">⚠️</div>
-                      <p>节点离线</p>
-                      {selectedState?.lastError && <p style={{ fontSize: 12, marginTop: 4 }}>{selectedState.lastError}</p>}
-                    </div>
-                  ) : selectedClients.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">📭</div>
-                      <p>该节点暂无客户端</p>
-                    </div>
+                  {nodes.length === 0 ? (
+                    <div className="empty-state"><div className="empty-state-icon">📡</div><p>暂无节点</p></div>
                   ) : (
                     <div className="client-table-wrap">
                       <table className="client-table">
                         <thead>
                           <tr>
-                            <th>名称</th>
-                            <th>地址</th>
-                            <th>Client ID</th>
-                            <th>状态</th>
-                            <th>订阅</th>
-                            <th>转发</th>
-                            <th>接收</th>
-                            <th>转发</th>
-                            <th>错误</th>
+                            <th style={{ width: 50, textAlign: 'center' }}>数量</th>
+                            <th style={{ textAlign: 'center' }}>节点名称</th>
+                            <th style={{ textAlign: 'center' }}>节点 IP</th>
+                            <th style={{ textAlign: 'center' }}>连接状态</th>
+                            <th style={{ textAlign: 'center' }}>节点在线数</th>
+                            <th style={{ textAlign: 'center' }}>禁用数量</th>
+                            <th style={{ textAlign: 'center' }}>节点总数</th>
+                            <th style={{ width: 50, textAlign: 'center' }}>操作</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedClients.map((c) => (
-                            <tr key={c.id}>
-                              <td style={{ fontWeight: 600 }}>{c.name}</td>
-                              <td><code>{c.broker.host}:{c.broker.port}</code></td>
-                              <td><code>{c.broker.clientId || '自动'}</code></td>
-                              <td>
-                                <span className="status-badge">
-                                  <StatusDot status={c.runtime?.status} />
-                                  {c.enabled ? (c.runtime?.status === 'connected' ? '已连接' : c.runtime?.status || '未知') : '已禁用'}
-                                </span>
-                              </td>
-                              <td><code>{c.rules.map((r) => r.subscribeTopic).join(', ')}</code></td>
-                              <td><code>{c.rules.map((r) => r.forwardTopic).join(', ')}</code></td>
-                              <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{c.runtime?.stats?.received || 0}</td>
-                              <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{c.runtime?.stats?.forwarded || 0}</td>
-                              <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: (c.runtime?.stats?.errors || 0) > 0 ? 'var(--danger)' : '' }}>{c.runtime?.stats?.errors || 0}</td>
-                            </tr>
-                          ))}
+                          {nodes.map((node, i) => {
+                            const state = nodeStates.find((s) => s.nodeId === node.id);
+                            const isOnline = state?.status === 'online';
+                            return (
+                              <tr key={node.id}>
+                                <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)' }}>{i + 1}</td>
+                                <td style={{ fontWeight: 600, textAlign: 'center' }}>{node.name}</td>
+                                <td style={{ textAlign: 'center' }}><code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${node.host}:${node.port}`, '_blank'); }}>{node.host}</code></td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <span className={`node-dot ${isOnline ? 'online' : 'offline'}`} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />
+                                  {isOnline ? '在线' : '离线'}
+                                </td>
+                                <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{state?.stats?.connected || 0}</td>
+                                <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{state?.stats?.disabled || 0}</td>
+                                <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{state?.stats?.total || 0}</td>
+                                <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                                  <button className="btn btn-sm btn-primary" style={{ marginRight: 4 }} onClick={() => handleEditNode(node)}>修改</button>
+                                  <button className="btn btn-sm btn-danger" onClick={() => handleDeleteNode(node.id)}>删除</button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
                   )}
+
                 </div>
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      {showingAdd && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000,
+        }} onClick={() => setShowingAdd(false)}>
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, padding: 24, width: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>添加节点</div>
+
+            {/* 手动添加区域 */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              <input className="form-input" placeholder="名称" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} style={{ flex: 1 }} />
+              <input className="form-input" placeholder="IP 地址" value={addForm.host} onChange={(e) => setAddForm({ ...addForm, host: e.target.value })} style={{ flex: 1 }} />
+              <input className="form-input" placeholder="端口" value={addForm.port} onChange={(e) => setAddForm({ ...addForm, port: e.target.value })} style={{ width: 80 }} />
+            </div>
+
+            {/* 操作按钮 */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <button className="btn btn-sm" style={{ background: 'var(--primary)', color: '#fff' }} onClick={handleSearchNodes} disabled={searching}>
+                {searching ? '搜索中...' : '搜索'}
+              </button>
+              <button className="btn btn-sm btn-primary" onClick={handleAddNode}>添加</button>
+              {discoveredNodes.length > 0 && (
+                <button className="btn btn-sm" style={{ background: 'var(--bg)', color: 'var(--text)' }} onClick={toggleSelectAll}>
+                {selectedDiscovered.size === discoveredNodes.length && discoveredNodes.length > 0 ? '取消全选' : '全选'}
+              </button>
+              )}
+              <button className="btn btn-sm" style={{ background: 'var(--bg)', color: 'var(--text)' }} onClick={() => { setShowingAdd(false); setDiscoveredNodes([]); setSelectedDiscovered(new Set()); }}>关闭</button>
+            </div>
+
+            {/* 搜索结果 */}
+            {discoveredNodes.length > 0 && (
+              <div style={{ flex: 1, overflowY: 'auto', marginBottom: 10 }}>
+                <table className="client-table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: 30, textAlign: 'center' }}>
+                        <input type="checkbox" checked={selectedDiscovered.size === discoveredNodes.length} onChange={() => {
+                          if (selectedDiscovered.size === discoveredNodes.length) setSelectedDiscovered(new Set());
+                          else setSelectedDiscovered(new Set(discoveredNodes.map((_, i) => i)));
+                        }} />
+                      </th>
+                      <th style={{ textAlign: 'center' }}>名称</th>
+                      <th style={{ textAlign: 'center' }}>IP</th>
+                      <th style={{ textAlign: 'center' }}>端口</th>
+                      <th style={{ textAlign: 'center' }}>在线</th>
+                      <th style={{ textAlign: 'center' }}>禁用</th>
+                      <th style={{ textAlign: 'center' }}>总数</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {discoveredNodes.map((node, i) => (
+                      <tr key={i} style={{ cursor: 'pointer' }} onClick={() => toggleDiscovered(i)}>
+                        <td style={{ textAlign: 'center' }}><input type="checkbox" checked={selectedDiscovered.has(i)} readOnly /></td>
+                        <td style={{ textAlign: 'center' }}>{node.name}</td>
+                        <td style={{ textAlign: 'center' }}><code>{node.host}</code></td>
+                        <td style={{ textAlign: 'center' }}>{node.port}</td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{node.stats?.connected ?? 0}</td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{node.stats?.disabled ?? 0}</td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{node.stats?.total ?? 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!searching && discoveredNodes.length === 0 && (
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>
+                点击「搜索」按钮扫描局域网内的节点
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {editingNode && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000,
+        }} onClick={() => setEditingNode(null)}>
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, padding: 24, width: 360,
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>修改节点名称</div>
+            <input
+              className="form-input"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              autoFocus
+              style={{ width: '100%', marginBottom: 14 }}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveEditNode(); }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-sm" style={{ background: 'var(--bg)', color: 'var(--text)' }} onClick={() => setEditingNode(null)}>取消</button>
+              <button className="btn btn-sm btn-primary" onClick={saveEditNode}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000,
+        }} onClick={() => setDeleteConfirm(null)}>
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, padding: 24, width: 360,
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>确定删除该节点？</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-sm btn-danger" onClick={confirmDelete}>删除</button>
+              <button className="btn btn-sm" style={{ background: 'var(--bg)', color: 'var(--text)' }} onClick={() => setDeleteConfirm(null)}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div style={{

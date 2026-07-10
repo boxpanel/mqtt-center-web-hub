@@ -37,7 +37,7 @@ body {
 /* ── 聚合统计 ── */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-top: 16px;
 }
@@ -63,15 +63,91 @@ body {
 
 .stat-card-value.green { color: var(--success); }
 .stat-card-value.red { color: var(--danger); }
-.stat-card-value.yellow { color: var(--warning); }
 .stat-card-value.blue { color: var(--primary); }
-.stat-card-value.muted { color: var(--text-muted); }
+
+/* ── 客户端统计卡片 ── */
+.client-stat-card { padding: 14px 16px; }
+.stat-rows { display: flex; flex-direction: column; gap: 0; }
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stat-label::before {
+  content: '';
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+}
+.stat-label.total::before { background: var(--primary); }
+.stat-label.connected::before { background: var(--success); }
+.stat-label.errors::before { background: var(--danger); }
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+.stat-value.blue { color: var(--primary); }
+.stat-value.green { color: var(--success); }
+.stat-value.red { color: var(--danger); }
+
+/* ── MetricCard (CPU/内存/存储) ── */
+.metric-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.metric-label {
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.metric-percent {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.metric-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.metric-detail {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
 
 /* ── 主体布局 ── */
 .main { padding: 20px 0 24px; }
-.main-row { display: flex; gap: 20px; }
-.main-sidebar { width: 360px; flex-shrink: 0; }
-.main-content { flex: 1; min-width: 0; }
 
 /* ── 面板 ── */
 .panel {
@@ -206,7 +282,5 @@ body {
 
 /* ── 响应式 ── */
 @media (max-width: 900px) {
-  .stats-grid { grid-template-columns: repeat(3, 1fr); }
-  .main-row { flex-direction: column; }
-  .main-sidebar { width: 100%; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }

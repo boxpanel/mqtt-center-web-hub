@@ -10,7 +10,7 @@ set -e
 
 REPO_URL="https://github.com/boxpanel/mqtt-center-web-hub.git"
 INSTALL_DIR="/opt/mqtt-center-web-hub"
-HUB_PORT=8080
+HUB_PORT=80
 NODE_VERSION="18"
 
 # ── GitHub 认证（私有仓库需要设置 GITHUB_TOKEN） ──
