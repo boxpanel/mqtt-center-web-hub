@@ -105,10 +105,10 @@ download_project() {
   if [ -d "$INSTALL_DIR" ]; then
     log_warn "目录 $INSTALL_DIR 已存在，正在更新..."
     cd "$INSTALL_DIR"
-    git pull
+    GIT_ASKPASS=echo git pull
   else
     log_info "克隆仓库到 $INSTALL_DIR ..."
-    git clone "$AUTH_REPO_URL" "$INSTALL_DIR"
+    GIT_ASKPASS=echo git clone --depth 1 "$AUTH_REPO_URL" "$INSTALL_DIR"
     cd "$INSTALL_DIR"
   fi
 }
