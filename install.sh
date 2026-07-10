@@ -170,7 +170,7 @@ show_summary() {
   log_step "安装完成！"
 
   local ip
-  ip=$(curl -s http://ip.sb 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "服务器IP")
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}' || curl -s http://ip.sb 2>/dev/null || echo "服务器IP")
 
   echo ""
   echo -e "  ${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
