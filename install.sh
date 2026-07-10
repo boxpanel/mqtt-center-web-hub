@@ -143,6 +143,7 @@ setup_service() {
 
   # 使用 PM2 管理进程
   cd "$INSTALL_DIR"
+  pm2 delete mqtt-center-hub 2>/dev/null || true
   PORT=$HUB_PORT pm2 start server/index.js --name mqtt-center-hub
   pm2 save
   pm2 startup
