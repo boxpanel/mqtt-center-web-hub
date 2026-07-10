@@ -39,7 +39,7 @@ class NodePoller {
         total: clients.length,
         connected: clients.filter((c) => c.runtime?.status === 'connected').length,
         disabled: clients.filter((c) => !c.enabled).length,
-        errors: clients.filter((c) => (c.runtime?.stats?.errors || 0) > 0).length,
+        errors: clients.filter((c) => !c.enabled || (c.runtime?.stats?.errors || 0) > 0).length,
       };
 
       this.nodeStates.set(node.id, {
