@@ -143,10 +143,10 @@ class NodePoller {
       totalNodes: all.length,
       onlineNodes: online.length,
       offlineNodes: all.length - online.length,
-      totalClients: online.reduce((s, n) => s + n.stats.total, 0),
-      totalConnected: online.reduce((s, n) => s + n.stats.connected, 0),
-      totalDisabled: online.reduce((s, n) => s + n.stats.disabled, 0),
-      totalErrors: online.reduce((s, n) => s + n.stats.errors, 0),
+      totalClients: online.reduce((s, n) => s + (n.stats?.total || 0), 0),
+      totalConnected: online.reduce((s, n) => s + (n.stats?.connected || 0), 0),
+      totalDisabled: online.reduce((s, n) => s + (n.stats?.disabled || 0), 0),
+      totalErrors: online.reduce((s, n) => s + (n.stats?.errors || 0), 0),
     };
   }
 
