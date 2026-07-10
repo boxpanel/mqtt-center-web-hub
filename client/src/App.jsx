@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  fetchNodes, deleteNode, updateNode, addNode, searchNodes,
+  fetchNodes, deleteNode, updateNode, addNode, searchNodes, fetchHubSystem,
   fetchSummary, fetchNodeStates, subscribeEvents,
 } from './api';
 import './App.css';
@@ -68,6 +68,7 @@ export default function App() {
   const [selectedDiscovered, setSelectedDiscovered] = useState(new Set());
   const [searching, setSearching] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [hubSystem, setHubSystem] = useState(null);
 
   const showToast = (msg, isError = false) => {
     setToast({ msg, isError });
@@ -83,6 +84,7 @@ export default function App() {
     loadNodes();
     fetchSummary().then(setSummary).catch(() => {});
     fetchNodeStates().then(setNodeStates).catch(() => {});
+    fetchHubSystem().then(setHubSystem).catch(() => {});
     const unsub = subscribeEvents((event) => {
       if (event.type === 'summary') setSummary(event.data);
       if (event.type === 'nodes') setNodeStates(event.data);
@@ -99,21 +101,14 @@ export default function App() {
     return unsub;
   }, [loadNodes]);
 
-  // ── 聚合系统指标 ──
-  const onlineStates = nodeStates.filter((s) => s.status === 'online' && s.system);
-  const avgCpu = onlineStates.length
-    ? Math.round(onlineStates.reduce((s, n) => s + (n.system.cpu?.percent || 0), 0) / onlineStates.length * 10) / 10
-    : 0;
-  const avgMem = onlineStates.length
-    ? Math.round(onlineStates.reduce((s, n) => s + (n.system.memory?.percent || 0), 0) / onlineStates.length * 10) / 10
-    : 0;
-  const avgDisk = onlineStates.length
-    ? Math.round(onlineStates.reduce((s, n) => s + (n.system.disk?.percent || 0), 0) / onlineStates.length * 10) / 10
-    : 0;
-  const totalMem = onlineStates.reduce((s, n) => s + (n.system.memory?.total || 0), 0);
-  const usedMem = onlineStates.reduce((s, n) => s + (n.system.memory?.used || 0), 0);
-  const totalDisk = onlineStates.reduce((s, n) => s + (n.system.disk?.total || 0), 0);
-  const usedDisk = onlineStates.reduce((s, n) => s + (n.system.disk?.used || 0), 0);
+  // ── 定时刷新 Hub 自身系统资源 ──
+  useEffect(() => {
+    const t = setInterval(() => fetchHubSystem().then(setHubSystem).catch(() => {}), 10000);
+    return () => clearInterval(t);
+  }, []);
+
+  // ── Hub 自身系统指标 ──
+  const sys = hubSystem || { cpu: { percent: 0, cores: 0 }, memory: { total: 0, used: 0, percent: 0 }, disk: { total: 0, used: 0, percent: 0 } };
 
   const handleDeleteNode = async (id) => {
     setDeleteConfirm(id);
@@ -214,9 +209,9 @@ export default function App() {
           <p className="subtitle">总监控平台 · 集中管理所有 MQTT Center 节点</p>
 
           <div className="stats-grid">
-            <MetricCard label="CPU" percent={avgCpu} detail={`${onlineStates.length} 节点平均 · ${avgCpu}%`} />
-            <MetricCard label="内存" percent={avgMem} detail={`${formatBytes(usedMem)} / ${formatBytes(totalMem)}`} />
-            <MetricCard label="存储" percent={avgDisk} detail={`${formatBytes(usedDisk)} / ${formatBytes(totalDisk)}`} />
+              <MetricCard label="CPU" percent={sys.cpu.percent} detail={`${sys.cpu.cores} 核 · ${sys.cpu.percent}%`} />
+              <MetricCard label="内存" percent={sys.memory.percent} detail={`${formatBytes(sys.memory.used)} / ${formatBytes(sys.memory.total)}`} />
+              <MetricCard label="存储" percent={sys.disk.percent} detail={`${formatBytes(sys.disk.used)} / ${formatBytes(sys.disk.total)}`} />
             <ClientStatCard total={summary.totalClients} connected={summary.totalConnected} errors={summary.totalErrors} />
           </div>
         </div>

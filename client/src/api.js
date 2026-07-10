@@ -59,3 +59,9 @@ export async function searchNodes() {
   if (!res.ok) throw new Error('搜索失败');
   return res.json();
 }
+
+export async function fetchHubSystem() {
+  const res = await fetch(`${API}/system`);
+  if (!res.ok) throw new Error('获取系统资源失败');
+  return res.json();
+}

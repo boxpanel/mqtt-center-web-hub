@@ -6,6 +6,7 @@ import logger from './logger.js';
 import { loadNodes } from './store.js';
 import { poller } from './poller.js';
 import { searchNodes } from './discovery.js';
+import { getSystemMetrics } from './system.js';
 import nodesRouter from './routes/nodes.js';
 import dashboardRouter from './routes/dashboard.js';
 
@@ -40,6 +41,15 @@ app.post('/api/heartbeat', (req, res) => {
   if (!host || !port) return res.status(400).json({ error: '缺少 host 或 port' });
   const updated = poller.handleHeartbeat({ host, port, stats, system, clients });
   res.json({ success: true, matched: updated });
+});
+
+// ── Hub 自身系统资源 ──
+app.get('/api/system', (req, res) => {
+  try {
+    res.json(getSystemMetrics());
+  } catch (err) {
+    res.status(500).json({ error: '获取系统资源失败' });
+  }
 });
 
 // ── 静态文件 ──
