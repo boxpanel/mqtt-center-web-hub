@@ -34,7 +34,7 @@ function MetricCard({ label, percent, detail }) {
   );
 }
 
-function ClientStatCard({ total, connected, disabled, errors }) {
+function ClientStatCard({ total, connected, errors }) {
   return (
     <div className="metric-card client-stat-card">
       <div className="stat-rows">
@@ -45,10 +45,6 @@ function ClientStatCard({ total, connected, disabled, errors }) {
         <div className="stat-row">
           <span className="stat-label connected">已连接</span>
           <span className="stat-value green">{connected}</span>
-        </div>
-        <div className="stat-row">
-          <span className="stat-label errors">禁用</span>
-          <span className="stat-value red">{disabled}</span>
         </div>
         <div className="stat-row">
           <span className="stat-label errors">异常</span>
@@ -216,7 +212,7 @@ export default function App() {
               <MetricCard label="CPU" percent={sys.cpu.percent} detail={`${sys.cpu.cores} 核 · ${sys.cpu.percent}%`} />
               <MetricCard label="内存" percent={sys.memory.percent} detail={`${formatBytes(sys.memory.used)} / ${formatBytes(sys.memory.total)}`} />
               <MetricCard label="存储" percent={sys.disk.percent} detail={`${formatBytes(sys.disk.used)} / ${formatBytes(sys.disk.total)}`} />
-            <ClientStatCard total={summary.totalClients} connected={summary.totalConnected} disabled={summary.totalDisabled} errors={summary.totalErrors} />
+            <ClientStatCard total={summary.totalClients} connected={summary.totalConnected} errors={summary.totalErrors} />
           </div>
         </div>
       </header>
