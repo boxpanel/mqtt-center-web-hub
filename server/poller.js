@@ -40,7 +40,7 @@ class NodePoller {
         connected: clients.filter((c) => c.runtime?.status === 'connected').length,
         disabled: clients.filter((c) => !c.enabled).length,
         errors: clients.filter((c) => !c.enabled || (c.runtime?.stats?.errors || 0) > 0).length,
-        unforwarded: clients.reduce((s, c) => s + (c.runtime?.stats?.unforwarded || 0), 0),
+        notForwarded: clients.reduce((s, c) => s + (c.runtime?.stats?.notForwarded || 0), 0),
       };
 
       this.nodeStates.set(node.id, {
