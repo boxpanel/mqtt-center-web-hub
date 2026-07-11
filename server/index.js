@@ -37,9 +37,9 @@ app.post('/api/discovery/search', async (req, res) => {
 
 // ── 客户端心跳上报 ──
 app.post('/api/heartbeat', (req, res) => {
-  const { host, port, stats, system, clients } = req.body;
+  const { host, port, stats, system, clients, version } = req.body;
   if (!host || !port) return res.status(400).json({ error: '缺少 host 或 port' });
-  const updated = poller.handleHeartbeat({ host, port, stats, system, clients });
+  const updated = poller.handleHeartbeat({ host, port, stats, system, clients, version });
   res.json({ success: true, matched: updated });
 });
 
