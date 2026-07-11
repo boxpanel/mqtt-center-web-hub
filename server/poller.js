@@ -52,6 +52,7 @@ class NodePoller {
         clients,
         system,
         stats,
+        version: this.nodeStates.get(node.id)?.version || null,
         lastSeen: new Date().toISOString(),
         latency: Date.now() - start,
       });
@@ -65,6 +66,7 @@ class NodePoller {
         clients: [],
         system: null,
         stats: { total: 0, connected: 0, disabled: 0, errors: 0 },
+        version: this.nodeStates.get(node.id)?.version || null,
         lastError: err.message,
         lastSeen: this.nodeStates.get(node.id)?.lastSeen || null,
         latency: 0,
