@@ -244,6 +244,7 @@ export default function App() {
                             <th style={{ textAlign: 'center' }}>禁用数量</th>
                             <th style={{ textAlign: 'center' }}>节点总数</th>
                             <th style={{ textAlign: 'center' }}>未转发</th>
+                            <th style={{ textAlign: 'center' }}>版本</th>
                             <th style={{ width: 50, textAlign: 'center' }}>操作</th>
                           </tr>
                         </thead>
@@ -264,6 +265,7 @@ export default function App() {
                                 <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{state?.stats?.disabled || 0}</td>
                                 <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{state?.stats?.total || 0}</td>
                                 <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--warning)' }}>{state?.stats?.notForwarded || 0}</td>
+                                <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>{state?.version || '-'}</td>
                                 <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                                   <button className="btn btn-sm btn-primary" style={{ marginRight: 4 }} onClick={() => handleEditNode(node)}>修改</button>
                                   <button className="btn btn-sm btn-danger" onClick={() => handleDeleteNode(node.id)}>删除</button>

@@ -90,6 +90,7 @@ class NodePoller {
           stats: data.stats || state.stats,
           system: data.system || state.system,
           clients: data.clients || state.clients,
+          version: data.version || state.version,
           lastSeen: new Date().toISOString(),
           lastHeartbeat: new Date().toISOString(),
           latency: 0,
