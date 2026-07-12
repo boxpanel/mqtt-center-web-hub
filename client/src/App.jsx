@@ -397,7 +397,6 @@ export default function App() {
                       </th>
                       <th style={{ textAlign: 'center' }}>名称</th>
                       <th style={{ textAlign: 'center' }}>IP 地址</th>
-                      <th style={{ textAlign: 'center' }}>端口</th>
                       <th style={{ textAlign: 'center' }}>在线</th>
                       <th style={{ textAlign: 'center' }}>禁用</th>
                       <th style={{ textAlign: 'center' }}>总数</th>
@@ -415,8 +414,7 @@ export default function App() {
                                         {item.label === '虚' ? null : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{item.port}</span>}
                                       </div>
                                     ))}</td>
-                        <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{node.items[0]?.port || '-'}</td>
-                        <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{node.stats?.connected ?? 0}</td>
+                          <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{node.stats?.connected ?? 0}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{node.stats?.disabled ?? 0}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{node.stats?.total ?? 0}</td>
                       </tr>
