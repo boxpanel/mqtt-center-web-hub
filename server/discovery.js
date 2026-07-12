@@ -56,21 +56,27 @@ export function searchNodes(hubPort) {
           // 格式2: MQTT-Center-web 客户端
           const key = data.hostname || data.ip;
           if (!groups.has(key)) {
-            groups.set(key, {
+            const entry = {
               name: key,
               port: data.port || 8088,
               ips: [data.ip],
               stats: data.stats || { total: 0, connected: 0, disabled: 0 },
-            });
+            };
+            // 标记VIP
+            if (data.vip) {
+              entry.vip = data.vip;
+              entry.ips.push(data.vip);
+            }
+            groups.set(key, entry);
           } else {
             const g = groups.get(key);
             if (!g.ips.includes(data.ip)) g.ips.push(data.ip);
             if (data.stats) g.stats = data.stats;
-          }
-          // 虚拟IP(VIP)也加入同一组
-          if (data.vip) {
-            const g = groups.get(key);
-            if (!g.ips.includes(data.vip)) g.ips.push(data.vip);
+            // 虚拟IP(VIP)也加入同一组并标记
+            if (data.vip && !g.ips.includes(data.vip)) {
+              g.vip = data.vip;
+              g.ips.push(data.vip);
+            }
           }
         }
       } catch { /* 忽略无法解析的包 */ }

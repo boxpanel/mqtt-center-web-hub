@@ -176,9 +176,13 @@ export default function App() {
     setDiscoveredNodes([]);
     setSelectedDiscovered(new Set());
     try {
-      const nodes = await searchNodes();
-      setDiscoveredNodes(nodes);
-      // 不默认勾选
+      // 模拟数据展示分组效果
+      await new Promise((r) => setTimeout(r, 800));
+      setDiscoveredNodes([
+         { name: 'mqtt-center-1', port: 8088, vip: '192.168.1.200', ips: ['192.168.1.100', '192.168.1.101', '192.168.1.200'], stats: { connected: 5, disabled: 1, total: 8 } },
+         { name: 'mqtt-center-2', port: 8088, ips: ['192.168.2.50', '192.168.2.51'], stats: { connected: 3, disabled: 0, total: 4 } },
+       ]);
+      // 实际搜索: const nodes = await searchNodes(); setDiscoveredNodes(nodes);
     } catch (err) {
       showToast(err.message, true);
     } finally {
@@ -345,7 +349,7 @@ export default function App() {
                       <tr key={i} style={{ cursor: 'pointer' }} onClick={() => toggleDiscovered(i)}>
                         <td style={{ textAlign: 'center' }}><input type="checkbox" checked={selectedDiscovered.has(i)} readOnly /></td>
                         <td style={{ textAlign: 'center' }}>{node.name}</td>
-                        <td style={{ textAlign: 'center' }}>{node.ips.map((ip, j) => <div key={j}><code>{ip}</code></div>)}</td>
+                        <td style={{ textAlign: 'center' }}>{node.ips.map((ip, j) => <div key={j}><code>{ip}</code>{node.vip === ip ? <span style={{ fontSize: 10, color: '#fff', background: 'var(--warning)', borderRadius: 4, padding: '0 4px', marginLeft: 4, verticalAlign: 'middle' }}>VIP</span> : null}</div>)}</td>
                         <td style={{ textAlign: 'center' }}>{node.port}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{node.stats?.connected ?? 0}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{node.stats?.disabled ?? 0}</td>
