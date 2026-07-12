@@ -280,7 +280,7 @@ export default function App() {
                                   {j === 0 ? <td rowSpan={span} style={{ fontWeight: 600, textAlign: 'center', verticalAlign: 'middle' }}>{node.name}</td> : null}
                                   <td style={{ textAlign: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                                      {hs.label ? <span style={{ fontSize: 10, color: '#fff', background: hs.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{hs.label}</span> : null}
+                                      {hs.label ? <span style={{ fontSize: 10, color: '#fff', background: hs.label === '虚' ? 'var(--warning)' : hs.label === '单' ? '#6b7280' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{hs.label}</span> : null}
                                       <code style={{ cursor: 'pointer' }} onDoubleClick={() => {
                                         if (hs.isVirtual && state?.hostStates) {
                                            // VIP双击：优先跳转主服务器，否则跳转备用服务器
@@ -405,7 +405,7 @@ export default function App() {
                         <td style={{ textAlign: 'center' }}>{node.name}</td>
                         <td style={{ textAlign: 'center' }}>{node.items.map((item, j) => (
                                       <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                                        {item.label ? <span style={{ fontSize: 10, color: '#fff', background: item.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{item.label}</span> : null}
+                                        {item.label ? <span style={{ fontSize: 10, color: '#fff', background: item.label === '虚' ? 'var(--warning)' : item.label === '单' ? '#6b7280' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{item.label}</span> : null}
                                         <code>{item.ip}</code>
                                         {item.label === '虚' ? null : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{item.port}</span>}
                                       </div>
