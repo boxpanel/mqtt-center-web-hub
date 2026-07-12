@@ -23,8 +23,8 @@ function getLocalIp() {
   return '127.0.0.1';
 }
 
-// 合并带标签的IP列表，去重且保留主/备/虚标签优先级
-function mergeIps(existing, incoming) {
+// 合并带标签的IP列表，去重
+function mergeLabeledIps(existing, incoming) {
   const map = new Map();
   for (const item of [...existing, ...incoming]) {
     if (!map.has(item.ip)) {
@@ -36,7 +36,8 @@ function mergeIps(existing, incoming) {
 
 export function searchNodes(hubPort) {
   return new Promise((resolve) => {
-    const groups = new Map(); // hostname → { name, hostname, port, ips, stats }
+    // 按 groupKey分组，VIP优先，无VIP时用hostname
+    const groups = new Map();
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
     const hubIp = getLocalIp();
     const DISCOVERY_MSG = Buffer.from(JSON.stringify({ type: 'mqtt-hub-discovery', version: 1, hubIp, hubPort: hubPort || 80 }));
@@ -51,42 +52,40 @@ export function searchNodes(hubPort) {
       try {
         const data = JSON.parse(msg.toString());
         if (data.type === 'mqtt-hub-discovery-resp' && data.host) {
-          // 格式1: 自定义客户端
+          // 格式1: 自定义客户端 - 不做分组
           const key = data.name || data.host;
           if (!groups.has(key)) {
             groups.set(key, {
               name: key,
-              port: data.port || 8088,
-              ips: [data.host],
+              label: null,
+              items: [{ ip: data.host, port: data.port || 8088, label: null }],
             });
-          } else {
-            const g = groups.get(key);
-            if (!g.ips.includes(data.host)) g.ips.push(data.host);
           }
         } else if (data.type === 'mqtt-hub-info' && data.ip) {
           // 格式2: MQTT-Center-web 客户端
-          const key = data.hostname || data.ip;
+          // 有VIP时按VIP分组，否则按hostname
+          const groupKey = data.vip || data.hostname || data.ip;
+          const port = data.port || 8088;
           const ips = data.ips || [data.ip];
-          // 构造带标签的IP列表
-          const labeledIps = ips.map((ip) => {
+
+          // 给每个IP加上label和port
+          const items = ips.map((ip) => {
             let label = null;
             if (data.vip && ip === data.vip) label = '虚';
             else if (ip === data.ip) label = '主';
             else label = '备';
-            return { ip, label };
+            return { ip, port, label };
           });
-          if (!groups.has(key)) {
-            const entry = {
-              name: key,
-              port: data.port || 8088,
-              labeledIps,
-              stats: data.stats || { total: 0, connected: 0, disabled: 0 },
-            };
-            groups.set(key, entry);
+
+          if (!groups.has(groupKey)) {
+            groups.set(groupKey, {
+              name: data.hostname || data.ip,
+              label: groupKey === data.vip ? '虚' : null,
+              items,
+            });
           } else {
-            const g = groups.get(key);
-            g.labeledIps = mergeIps(g.labeledIps, labeledIps);
-            if (data.stats) g.stats = data.stats;
+            const g = groups.get(groupKey);
+            g.items = mergeLabeledIps(g.items, items);
           }
         }
       } catch { /* 忽略无法解析的包 */ }
