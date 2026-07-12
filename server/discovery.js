@@ -76,11 +76,6 @@ export function searchNodes(hubPort) {
             else label = '备';
             return { ip, port, label };
           });
-          // 排序：虚 > 主 > 备
-          items.sort((a, b) => {
-            const order = { '虚': 0, '主': 1, '备': 2 };
-            return (order[a.label] ?? 3) - (order[b.label] ?? 3);
-          });
 
           if (!groups.has(groupKey)) {
             groups.set(groupKey, {

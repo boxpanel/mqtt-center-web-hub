@@ -283,10 +283,7 @@ export default function App() {
                             const state = nodeStates.find((s) => s.nodeId === node.id);
                             const isOnline = state?.status === 'online';
                             // 多IP节点：每个host独立一行
-                            const hostRows = state?.hostStates || (node.hosts ? node.hosts.map((h) => ({ ...h, status: isOnline ? 'online' : 'offline', stats: { total: 0, connected: 0, disabled: 0, notForwarded: 0 } })).sort((a, b) => {
-                              const order = { '虚': 0, '主': 1, '备': 2, null: 3 };
-                              return (order[a.label] ?? 3) - (order[b.label] ?? 3);
-                            }) : null);
+                            const hostRows = state?.hostStates || (node.hosts ? node.hosts.map((h) => ({ ...h, status: isOnline ? 'online' : 'offline', stats: { total: 0, connected: 0, disabled: 0, notForwarded: 0 } })) : null);
                             if (hostRows && hostRows.length > 1) {
                               const span = hostRows.length;
                               // 分组显示
@@ -298,7 +295,7 @@ export default function App() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
                                       {hs.label ? <span style={{ fontSize: 10, color: '#fff', background: hs.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{hs.label}</span> : null}
                                       <code style={{ cursor: 'pointer' }} onDoubleClick={() => window.open(`http://${hs.host}:${hs.port}`, '_blank')}>{hs.host}</code>
-                                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{hs.port}</span>
+                                      {hs.isVirtual ? null : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{hs.port}</span>}
                                     </div>
                                   </td>
                                   <td style={{ textAlign: 'center' }}>{hs.isVirtual ? '' : <><span className={`node-dot ${hs.status === 'online' ? 'online' : 'offline'}`} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />{hs.status === 'online' ? '在线' : '离线'}</>}</td>
