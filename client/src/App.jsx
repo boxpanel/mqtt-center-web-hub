@@ -187,26 +187,9 @@ export default function App() {
     setDiscoveredNodes([]);
     setSelectedDiscovered(new Set());
     try {
-      // 模拟数据展示分组效果
-      await new Promise((r) => setTimeout(r, 800));
-      setDiscoveredNodes([
-         {
-           name: 'mqtt-center-1',
-           items: [
-             { ip: '192.168.1.100', port: 8088, label: '主' },
-             { ip: '192.168.1.101', port: 8089, label: '备' },
-             { ip: '192.168.1.200', port: 8088, label: '虚' },
-           ],
-         },
-         {
-           name: 'mqtt-center-2',
-           items: [
-             { ip: '192.168.2.50', port: 8088, label: '主' },
-             { ip: '192.168.2.51', port: 8088, label: '备' },
-           ],
-         },
-       ]);
-      // 实际搜索: const nodes = await searchNodes(); setDiscoveredNodes(nodes);
+      const nodes = await searchNodes();
+      setDiscoveredNodes(nodes);
+      // 不默认勾选
     } catch (err) {
       showToast(err.message, true);
     } finally {
