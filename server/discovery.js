@@ -72,7 +72,8 @@ export function searchNodes(hubPort) {
           const items = ips.map((ip) => {
             let label = null;
             if (data.vip && ip === data.vip) label = '虚';
-            else if (ip === data.ip) label = '主';
+            else if (data.role === 'master' || (ip === data.ip && data.role !== 'standby')) label = '主';
+            else if (data.role === 'standby' || (ip !== data.ip && data.role !== 'master')) label = '备';
             else label = '备';
             return { ip, port, label };
           });

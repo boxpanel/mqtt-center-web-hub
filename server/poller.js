@@ -93,6 +93,7 @@ class NodePoller {
             stats: aggStats,
             version: this.nodeStates.get(node.id)?.version || null,
             vip: this.nodeStates.get(node.id)?.vip || null,
+            role: this.nodeStates.get(node.id)?.role || null,
             lastSeen: new Date().toISOString(),
             latency: onlineHosts[0]?.latency || 0,
           });
@@ -112,6 +113,7 @@ class NodePoller {
           ...result,
           version: this.nodeStates.get(node.id)?.version || null,
           vip: this.nodeStates.get(node.id)?.vip || null,
+          role: this.nodeStates.get(node.id)?.role || null,
           lastSeen: new Date().toISOString(),
         });
       }
@@ -133,6 +135,7 @@ class NodePoller {
         stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 },
         version: this.nodeStates.get(node.id)?.version || null,
         vip: this.nodeStates.get(node.id)?.vip || null,
+        role: this.nodeStates.get(node.id)?.role || null,
         lastError: err.message,
         lastSeen: this.nodeStates.get(node.id)?.lastSeen || null,
         latency: 0,
@@ -158,6 +161,7 @@ class NodePoller {
           clients: data.clients || state.clients,
           version: data.version || state.version,
           vip: data.vip || state.vip,
+          role: data.role || state.role,
           lastSeen: now,
           lastHeartbeat: now,
           latency: 0,
