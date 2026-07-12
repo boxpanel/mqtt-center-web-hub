@@ -283,7 +283,10 @@ export default function App() {
                             const state = nodeStates.find((s) => s.nodeId === node.id);
                             const isOnline = state?.status === 'online';
                             // 多IP节点：每个host独立一行
-                            const hostRows = state?.hostStates || (node.hosts ? node.hosts.map((h) => ({ ...h, status: isOnline ? 'online' : 'offline', stats: { total: 0, connected: 0, disabled: 0, notForwarded: 0 } })) : null);
+                            const hostRows = state?.hostStates || (node.hosts ? node.hosts.map((h) => ({ ...h, status: isOnline ? 'online' : 'offline', stats: { total: 0, connected: 0, disabled: 0, notForwarded: 0 } })).sort((a, b) => {
+                              const order = { '虚': 0, '主': 1, '备': 2, null: 3 };
+                              return (order[a.label] ?? 3) - (order[b.label] ?? 3);
+                            }) : null);
                             if (hostRows && hostRows.length > 1) {
                               const span = hostRows.length;
                               // 分组显示
@@ -291,23 +294,19 @@ export default function App() {
                                 <tr key={`${node.id}-${j}`} style={{ background: j % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                                   {j === 0 ? <td rowSpan={span} style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)' }}>{i + 1}</td> : null}
                                   {j === 0 ? <td rowSpan={span} style={{ fontWeight: 600, textAlign: 'center', verticalAlign: 'middle' }}>{node.name}</td> : null}
-                                  <td style={{ textAlign: 'center', opacity: hs.isVirtual ? 0.7 : 1 }}>
+                                  <td style={{ textAlign: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
                                       {hs.label ? <span style={{ fontSize: 10, color: '#fff', background: hs.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{hs.label}</span> : null}
-                                      <code style={{ cursor: hs.status === 'online' && !hs.isVirtual ? 'pointer' : 'default' }} onDoubleClick={() => { if (hs.status === 'online' && !hs.isVirtual) window.open(`http://${hs.host}:${hs.port}`, '_blank'); }}>{hs.host}</code>
+                                      <code style={{ cursor: 'pointer' }} onDoubleClick={() => window.open(`http://${hs.host}:${hs.port}`, '_blank')}>{hs.host}</code>
                                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{hs.port}</span>
-                                      {hs.isVirtual ? <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>引用</span> : null}
                                     </div>
                                   </td>
-                                  <td style={{ textAlign: 'center', opacity: hs.isVirtual ? 0.7 : 1 }}>
-                                    <span className={`node-dot ${hs.status === 'online' ? 'online' : 'offline'}`} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />
-                                    {hs.status === 'online' ? '在线' : '离线'}
-                                  </td>
-                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)', opacity: hs.isVirtual ? 0.7 : 1 }}>{hs.stats?.connected || 0}</td>
-                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)', opacity: hs.isVirtual ? 0.7 : 1 }}>{hs.stats?.disabled || 0}</td>
-                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', opacity: hs.isVirtual ? 0.7 : 1 }}>{hs.stats?.total || 0}</td>
-                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--warning)', opacity: hs.isVirtual ? 0.7 : 1 }}>{hs.stats?.notForwarded || 0}</td>
-                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>{j === 0 ? (state?.version || '-') : ''}</td>
+                                  <td style={{ textAlign: 'center' }}>{hs.isVirtual ? '' : <><span className={`node-dot ${hs.status === 'online' ? 'online' : 'offline'}`} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />{hs.status === 'online' ? '在线' : '离线'}</>}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{hs.isVirtual ? '' : (hs.stats?.connected || 0)}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{hs.isVirtual ? '' : (hs.stats?.disabled || 0)}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{hs.isVirtual ? '' : (hs.stats?.total || 0)}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--warning)' }}>{hs.isVirtual ? '' : (hs.stats?.notForwarded || 0)}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>{hs.isVirtual ? '' : (j === 0 ? (state?.version || '-') : '')}</td>
                                   {j === 0 ? <td rowSpan={span} style={{ whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                                     <button className="btn btn-sm btn-primary" style={{ marginRight: 4 }} onClick={() => handleEditNode(node)}>修改</button>
                                     <button className="btn btn-sm btn-danger" onClick={() => handleDeleteNode(node.id)}>删除</button>

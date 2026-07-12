@@ -57,10 +57,10 @@ class NodePoller {
               ? { host: h.host, port: h.port, label: h.label || null, status: 'online', ...r.value, lastSeen: new Date().toISOString() }
               : { host: h.host, port: h.port, label: h.label || null, status: 'offline', clients: [], system: null, stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 }, lastError: r.reason?.message, lastSeen: null, latency: 0 };
           });
-          // 如果VIP存在，将其状态标记为引用主服务器的状态
+          // 如果VIP存在，将其状态标记为引用主服务器的状态（显示在最上方）
           if (vipHost) {
             const mainHost = hostStates.find((hs) => hs.label === '主') || hostStates[0];
-            hostStates.push({
+            hostStates.unshift({
               host: vipHost.host,
               port: vipHost.port,
               label: '虚',
@@ -125,9 +125,9 @@ class NodePoller {
         nodePort: node.port,
         hosts: node.hosts,
         status: 'offline',
-        hostStates: (node.hosts ? node.hosts.filter((h) => h.label !== '虚').map((h) => ({ host: h.host, port: h.port, label: h.label || null, status: 'offline', clients: [], system: null, stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 }, lastError: err.message, lastSeen: null, latency: 0 })) : []).concat(
-          vipHost ? [{ host: vipHost.host, port: vipHost.port, label: '虚', status: 'offline', stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 }, lastSeen: null, latency: 0, isVirtual: true }] : []
-        ),
+        hostStates: (vipHost ? [{ host: vipHost.host, port: vipHost.port, label: '虚', status: 'offline', stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 }, lastSeen: null, latency: 0, isVirtual: true }] : []).concat(
+           node.hosts ? node.hosts.filter((h) => h.label !== '虚').map((h) => ({ host: h.host, port: h.port, label: h.label || null, status: 'offline', clients: [], system: null, stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 }, lastError: err.message, lastSeen: null, latency: 0 })) : []
+         ),
         clients: [],
         system: null,
         stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 },
