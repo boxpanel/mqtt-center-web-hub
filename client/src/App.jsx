@@ -148,7 +148,8 @@ export default function App() {
       // 添加勾选的搜索结果（一组可能包含多个IP）
       let added = 0;
       for (const group of checked) {
-        for (const ip of group.ips) {
+        const ips = group.labeledIps || group.ips.map((ip) => ({ ip, label: null }));
+        for (const { ip } of ips) {
           try {
             await addNode({ name: group.ips.length > 1 ? `${group.name} (${ip})` : group.name, host: ip, port: String(group.port) });
             added++;
@@ -179,8 +180,8 @@ export default function App() {
       // 模拟数据展示分组效果
       await new Promise((r) => setTimeout(r, 800));
       setDiscoveredNodes([
-         { name: 'mqtt-center-1', port: 8088, vip: '192.168.1.200', ips: ['192.168.1.100', '192.168.1.101', '192.168.1.200'], stats: { connected: 5, disabled: 1, total: 8 } },
-         { name: 'mqtt-center-2', port: 8088, ips: ['192.168.2.50', '192.168.2.51'], stats: { connected: 3, disabled: 0, total: 4 } },
+         { name: 'mqtt-center-1', port: 8088, vip: '192.168.1.200', ips: ['192.168.1.100', '192.168.1.101', '192.168.1.200'], labeledIps: [{ip:'192.168.1.100',label:'主'},{ip:'192.168.1.101',label:'备'},{ip:'192.168.1.200',label:'虚'}], stats: { connected: 5, disabled: 1, total: 8 } },
+         { name: 'mqtt-center-2', port: 8088, ips: ['192.168.2.50', '192.168.2.51'], labeledIps: [{ip:'192.168.2.50',label:'主'},{ip:'192.168.2.51',label:'备'}], stats: { connected: 3, disabled: 0, total: 4 } },
        ]);
       // 实际搜索: const nodes = await searchNodes(); setDiscoveredNodes(nodes);
     } catch (err) {
@@ -349,8 +350,13 @@ export default function App() {
                       <tr key={i} style={{ cursor: 'pointer' }} onClick={() => toggleDiscovered(i)}>
                         <td style={{ textAlign: 'center' }}><input type="checkbox" checked={selectedDiscovered.has(i)} readOnly /></td>
                         <td style={{ textAlign: 'center' }}>{node.name}</td>
-                        <td style={{ textAlign: 'center' }}>{node.ips.map((ip, j) => <div key={j}><code>{ip}</code>{node.vip === ip ? <span style={{ fontSize: 10, color: '#fff', background: 'var(--warning)', borderRadius: 4, padding: '0 4px', marginLeft: 4, verticalAlign: 'middle' }}>VIP</span> : null}</div>)}</td>
-                        <td style={{ textAlign: 'center' }}>{node.port}</td>
+                        <td style={{ textAlign: 'center' }}>{(node.labeledIps || node.ips.map((ip) => ({ ip, label: null }))).map((item, j) => (
+                          <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                            <code>{item.ip}</code>
+                            {item.label ? <span style={{ fontSize: 10, color: '#fff', background: item.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{item.label}</span> : null}
+                          </div>
+                        ))}</td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{node.port}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{node.stats?.connected ?? 0}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{node.stats?.disabled ?? 0}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{node.stats?.total ?? 0}</td>

@@ -23,6 +23,17 @@ function getLocalIp() {
   return '127.0.0.1';
 }
 
+// 合并带标签的IP列表，去重且保留主/备/虚标签优先级
+function mergeIps(existing, incoming) {
+  const map = new Map();
+  for (const item of [...existing, ...incoming]) {
+    if (!map.has(item.ip)) {
+      map.set(item.ip, item);
+    }
+  }
+  return [...map.values()];
+}
+
 export function searchNodes(hubPort) {
   return new Promise((resolve) => {
     const groups = new Map(); // hostname → { name, hostname, port, ips, stats }
@@ -55,28 +66,27 @@ export function searchNodes(hubPort) {
         } else if (data.type === 'mqtt-hub-info' && data.ip) {
           // 格式2: MQTT-Center-web 客户端
           const key = data.hostname || data.ip;
+          const ips = data.ips || [data.ip];
+          // 构造带标签的IP列表
+          const labeledIps = ips.map((ip) => {
+            let label = null;
+            if (data.vip && ip === data.vip) label = '虚';
+            else if (ip === data.ip) label = '主';
+            else label = '备';
+            return { ip, label };
+          });
           if (!groups.has(key)) {
             const entry = {
               name: key,
               port: data.port || 8088,
-              ips: [data.ip],
+              labeledIps,
               stats: data.stats || { total: 0, connected: 0, disabled: 0 },
             };
-            // 标记VIP
-            if (data.vip) {
-              entry.vip = data.vip;
-              entry.ips.push(data.vip);
-            }
             groups.set(key, entry);
           } else {
             const g = groups.get(key);
-            if (!g.ips.includes(data.ip)) g.ips.push(data.ip);
+            g.labeledIps = mergeIps(g.labeledIps, labeledIps);
             if (data.stats) g.stats = data.stats;
-            // 虚拟IP(VIP)也加入同一组并标记
-            if (data.vip && !g.ips.includes(data.vip)) {
-              g.vip = data.vip;
-              g.ips.push(data.vip);
-            }
           }
         }
       } catch { /* 忽略无法解析的包 */ }
