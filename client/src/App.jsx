@@ -409,12 +409,12 @@ export default function App() {
                         <td style={{ textAlign: 'center' }}><input type="checkbox" checked={selectedDiscovered.has(i)} readOnly /></td>
                         <td style={{ textAlign: 'center' }}>{node.name}</td>
                         <td style={{ textAlign: 'center' }}>{node.items.map((item, j) => (
-                          <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                            {item.label ? <span style={{ fontSize: 10, color: '#fff', background: item.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{item.label}</span> : null}
-                            <code>{item.ip}</code>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{item.port}</span>
-                          </div>
-                        ))}</td>
+                                      <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                                        {item.label ? <span style={{ fontSize: 10, color: '#fff', background: item.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{item.label}</span> : null}
+                                        <code>{item.ip}</code>
+                                        {item.label === '虚' ? null : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{item.port}</span>}
+                                      </div>
+                                    ))}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{node.items[0]?.port || '-'}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{node.stats?.connected ?? 0}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{node.stats?.disabled ?? 0}</td>
