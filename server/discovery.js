@@ -58,6 +58,15 @@ export function searchNodes(hubPort) {
               stats: data.stats || { total: 0, connected: 0, disabled: 0 },
             });
           }
+          // 如果有虚拟IP(VIP)，也加入搜索结果
+          if (data.vip && !results.some((r) => r.host === data.vip && r.port === data.port)) {
+            results.push({
+              name: `${data.hostname || data.ip} (VIP)`,
+              host: data.vip,
+              port: data.port || 8088,
+              stats: data.stats || { total: 0, connected: 0, disabled: 0 },
+            });
+          }
         }
       } catch { /* 忽略无法解析的包 */ }
     });

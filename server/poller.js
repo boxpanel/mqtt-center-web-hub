@@ -53,6 +53,7 @@ class NodePoller {
         system,
         stats,
         version: this.nodeStates.get(node.id)?.version || null,
+        vip: this.nodeStates.get(node.id)?.vip || null,
         lastSeen: new Date().toISOString(),
         latency: Date.now() - start,
       });
@@ -67,6 +68,7 @@ class NodePoller {
         system: null,
         stats: { total: 0, connected: 0, disabled: 0, errors: 0 },
         version: this.nodeStates.get(node.id)?.version || null,
+        vip: this.nodeStates.get(node.id)?.vip || null,
         lastError: err.message,
         lastSeen: this.nodeStates.get(node.id)?.lastSeen || null,
         latency: 0,
@@ -93,6 +95,7 @@ class NodePoller {
           system: data.system || state.system,
           clients: data.clients || state.clients,
           version: data.version || state.version,
+          vip: data.vip || state.vip,
           lastSeen: new Date().toISOString(),
           lastHeartbeat: new Date().toISOString(),
           latency: 0,
