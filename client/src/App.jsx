@@ -153,7 +153,7 @@ export default function App() {
             // 多IP分组：一次添加所有IP
             await addNode({
               name: group.name,
-              hosts: group.items.map((item) => ({ host: item.ip, port: String(item.port) })),
+              hosts: group.items.map((item) => ({ host: item.ip, port: String(item.port), label: item.label })),
             });
           } else {
             // 单IP：保持原有格式
@@ -291,6 +291,7 @@ export default function App() {
                                   {node.hosts ? (
                                     node.hosts.map((h, j) => (
                                       <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                                        {h.label ? <span style={{ fontSize: 10, color: '#fff', background: h.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{h.label}</span> : null}
                                         <code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${h.host}:${h.port}`, '_blank'); }}>{h.host}</code>
                                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{h.port}</span>
                                       </div>

@@ -44,7 +44,11 @@ router.post('/', (req, res) => {
     const node = {
       id: uuidv4(),
       name: name.trim(),
-      hosts: hosts.map((h) => ({ host: h.host.trim(), port: Number(h.port) || 80 })),
+      hosts: hosts.map((h) => ({
+        host: h.host.trim(),
+        port: Number(h.port) || 80,
+        label: h.label || null,
+      })),
       host: hosts[0].host.trim(),
       port: Number(hosts[0].port) || 80,
       createdAt: new Date().toISOString(),
