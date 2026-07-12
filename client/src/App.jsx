@@ -145,15 +145,26 @@ export default function App() {
   const handleAddNode = async () => {
     const checked = [...selectedDiscovered].map((i) => discoveredNodes[i]).filter(Boolean);
     if (checked.length > 0) {
-      // 添加勾选的搜索结果（一组可能包含多个IP）
+      // 添加勾选的搜索结果
       let added = 0;
       for (const group of checked) {
-        for (const item of group.items) {
-          try {
-            await addNode({ name: group.items.length > 1 ? `${group.name} (${item.ip})` : group.name, host: item.ip, port: String(item.port) });
-            added++;
-          } catch { /* 跳过失败 */ }
-        }
+        try {
+          if (group.items.length > 1) {
+            // 多IP分组：一次添加所有IP
+            await addNode({
+              name: group.name,
+              hosts: group.items.map((item) => ({ host: item.ip, port: String(item.port) })),
+            });
+          } else {
+            // 单IP：保持原有格式
+            await addNode({
+              name: group.name,
+              host: group.items[0].ip,
+              port: String(group.items[0].port),
+            });
+          }
+          added++;
+        } catch { /* 跳过失败 */ }
       }
       showToast(`成功添加 ${added} 个节点`);
       setShowingAdd(false);
@@ -257,7 +268,8 @@ export default function App() {
                           <tr>
                             <th style={{ width: 50, textAlign: 'center' }}>数量</th>
                             <th style={{ textAlign: 'center' }}>节点名称</th>
-                            <th style={{ textAlign: 'center' }}>节点 IP</th>
+                            <th style={{ textAlign: 'center' }}>IP 地址</th>
+                            <th style={{ textAlign: 'center' }}>端口</th>
                             <th style={{ textAlign: 'center' }}>连接状态</th>
                             <th style={{ textAlign: 'center' }}>节点在线数</th>
                             <th style={{ textAlign: 'center' }}>禁用数量</th>
@@ -275,7 +287,22 @@ export default function App() {
                               <tr key={node.id}>
                                 <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)' }}>{i + 1}</td>
                                 <td style={{ fontWeight: 600, textAlign: 'center' }}>{node.name}</td>
-                                <td style={{ textAlign: 'center' }}><code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${node.host}:${node.port}`, '_blank'); }}>{node.host}</code></td>
+                                <td style={{ textAlign: 'center' }}>
+                                  {node.hosts ? (
+                                    node.hosts.map((h, j) => (
+                                      <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                                        <code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${h.host}:${h.port}`, '_blank'); }}>{h.host}</code>
+                                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{h.port}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                                      <code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${node.host}:${node.port}`, '_blank'); }}>{node.host}</code>
+                                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{node.port}</span>
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>{node.hosts ? node.hosts.map((h) => h.port).join('/') : node.port}</td>
                                 <td style={{ textAlign: 'center' }}>
                                   <span className={`node-dot ${isOnline ? 'online' : 'offline'}`} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />
                                   {isOnline ? '在线' : '离线'}

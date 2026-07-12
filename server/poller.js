@@ -161,8 +161,14 @@ class NodePoller {
     if (this.timer) return;
     this._nodes = nodes;
     logger.info({ interval: POLL_INTERVAL }, '轮询器已启动');
-    this.pollAll(nodes);
-    this.timer = setInterval(() => this.pollAll(this._nodes), POLL_INTERVAL);
+    const validNodes = nodes.filter((n) => n.host || (n.hosts && n.hosts.length > 0));
+    for (const node of validNodes) {
+      this.addNode(node);
+    }
+    this.timer = setInterval(() => {
+      const currentNodes = this._nodes || [];
+      this.pollAll(currentNodes);
+    }, POLL_INTERVAL);
   }
 
   stop() {

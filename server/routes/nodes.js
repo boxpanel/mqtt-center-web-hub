@@ -30,8 +30,36 @@ router.get('/', (req, res) => {
 
 // ── 添加节点 ──
 router.post('/', (req, res) => {
-  const { name, host, port } = req.body;
+  const { name, host, port, hosts } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: '节点名称不能为空' });
+
+  // hosts 数组模式（多IP分组）
+  if (Array.isArray(hosts) && hosts.length > 0) {
+    for (const h of hosts) {
+      if (!h.host?.trim()) return res.status(400).json({ error: '主机地址不能为空' });
+      const p = Number(h.port) || 80;
+      if (p < 1 || p > 65535) return res.status(400).json({ error: '端口无效' });
+    }
+    const nodes = loadNodes();
+    const node = {
+      id: uuidv4(),
+      name: name.trim(),
+      hosts: hosts.map((h) => ({ host: h.host.trim(), port: Number(h.port) || 80 })),
+      host: hosts[0].host.trim(),
+      port: Number(hosts[0].port) || 80,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    nodes.push(node);
+    saveNodes(nodes);
+    logger.info({ node: node.name }, '分组节点已添加');
+    // 轮询第一个IP
+    poller.addNode(node);
+    res.status(201).json(node);
+    return;
+  }
+
+  // 单IP模式（原有逻辑）
   if (!host?.trim()) return res.status(400).json({ error: '主机地址不能为空' });
   const p = Number(port) || 80;
   if (p < 1 || p > 65535) return res.status(400).json({ error: '端口无效' });
