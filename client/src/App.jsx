@@ -265,8 +265,12 @@ export default function App() {
                           {nodes.map((node, i) => {
                             const state = nodeStates.find((s) => s.nodeId === node.id);
                             const isOnline = state?.status === 'online';
-                            // 多IP节点：每个host独立一行
-                            const hostRows = state?.hostStates || (node.hosts ? node.hosts.map((h) => ({ ...h, status: isOnline ? 'online' : 'offline', stats: { total: 0, connected: 0, disabled: 0, notForwarded: 0 } })) : null);
+                            // 多IP节点：每个host独立一行，按虚→主→备排序
+                            const hostRows = (state?.hostStates || (node.hosts ? node.hosts.map((h) => ({ ...h, status: isOnline ? 'online' : 'offline', stats: { total: 0, connected: 0, disabled: 0, notForwarded: 0 } })) : null))
+                              ?.slice().sort((a, b) => {
+                                const order = { '虚': 0, '主': 1, '备': 2 };
+                                return (order[a.label] ?? 99) - (order[b.label] ?? 99);
+                              });
                             if (hostRows && hostRows.length > 1) {
                               const span = hostRows.length;
                               // 分组显示
