@@ -145,13 +145,15 @@ export default function App() {
   const handleAddNode = async () => {
     const checked = [...selectedDiscovered].map((i) => discoveredNodes[i]).filter(Boolean);
     if (checked.length > 0) {
-      // 添加勾选的搜索结果
+      // 添加勾选的搜索结果（一组可能包含多个IP）
       let added = 0;
-      for (const node of checked) {
-        try {
-          await addNode({ name: node.name, host: node.host, port: String(node.port) });
-          added++;
-        } catch { /* 跳过失败 */ }
+      for (const group of checked) {
+        for (const ip of group.ips) {
+          try {
+            await addNode({ name: group.ips.length > 1 ? `${group.name} (${ip})` : group.name, host: ip, port: String(group.port) });
+            added++;
+          } catch { /* 跳过失败 */ }
+        }
       }
       showToast(`成功添加 ${added} 个节点`);
       setShowingAdd(false);
@@ -331,7 +333,7 @@ export default function App() {
                         }} />
                       </th>
                       <th style={{ textAlign: 'center' }}>名称</th>
-                      <th style={{ textAlign: 'center' }}>IP</th>
+                      <th style={{ textAlign: 'center' }}>IP 地址</th>
                       <th style={{ textAlign: 'center' }}>端口</th>
                       <th style={{ textAlign: 'center' }}>在线</th>
                       <th style={{ textAlign: 'center' }}>禁用</th>
@@ -343,7 +345,7 @@ export default function App() {
                       <tr key={i} style={{ cursor: 'pointer' }} onClick={() => toggleDiscovered(i)}>
                         <td style={{ textAlign: 'center' }}><input type="checkbox" checked={selectedDiscovered.has(i)} readOnly /></td>
                         <td style={{ textAlign: 'center' }}>{node.name}</td>
-                        <td style={{ textAlign: 'center' }}><code>{node.host}</code></td>
+                        <td style={{ textAlign: 'center' }}>{node.ips.map((ip, j) => <div key={j}><code>{ip}</code></div>)}</td>
                         <td style={{ textAlign: 'center' }}>{node.port}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{node.stats?.connected ?? 0}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{node.stats?.disabled ?? 0}</td>

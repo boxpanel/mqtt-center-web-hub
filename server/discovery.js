@@ -25,7 +25,7 @@ function getLocalIp() {
 
 export function searchNodes(hubPort) {
   return new Promise((resolve) => {
-    const results = [];
+    const groups = new Map(); // hostname → { name, hostname, port, ips, stats }
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
     const hubIp = getLocalIp();
     const DISCOVERY_MSG = Buffer.from(JSON.stringify({ type: 'mqtt-hub-discovery', version: 1, hubIp, hubPort: hubPort || 80 }));
@@ -33,39 +33,44 @@ export function searchNodes(hubPort) {
     socket.on('error', (err) => {
       logger.warn({ err }, 'UDP 发现 socket 错误');
       socket.close();
-      resolve(results);
+      resolve([...groups.values()]);
     });
 
     socket.on('message', (msg) => {
       try {
         const data = JSON.parse(msg.toString());
         if (data.type === 'mqtt-hub-discovery-resp' && data.host) {
-          // 格式1: mqtt-hub-discovery-resp（自定义客户端）
-          if (!results.some((r) => r.host === data.host && r.port === data.port)) {
-            results.push({
-              name: data.name || data.host,
-              host: data.host,
+          // 格式1: 自定义客户端
+          const key = data.name || data.host;
+          if (!groups.has(key)) {
+            groups.set(key, {
+              name: key,
               port: data.port || 8088,
+              ips: [data.host],
             });
+          } else {
+            const g = groups.get(key);
+            if (!g.ips.includes(data.host)) g.ips.push(data.host);
           }
         } else if (data.type === 'mqtt-hub-info' && data.ip) {
-          // 格式2: mqtt-hub-info（MQTT-Center-web 客户端）
-          if (!results.some((r) => r.host === data.ip && r.port === data.port)) {
-            results.push({
-              name: data.hostname || data.ip,
-              host: data.ip,
+          // 格式2: MQTT-Center-web 客户端
+          const key = data.hostname || data.ip;
+          if (!groups.has(key)) {
+            groups.set(key, {
+              name: key,
               port: data.port || 8088,
+              ips: [data.ip],
               stats: data.stats || { total: 0, connected: 0, disabled: 0 },
             });
+          } else {
+            const g = groups.get(key);
+            if (!g.ips.includes(data.ip)) g.ips.push(data.ip);
+            if (data.stats) g.stats = data.stats;
           }
-          // 如果有虚拟IP(VIP)，也加入搜索结果
-          if (data.vip && !results.some((r) => r.host === data.vip && r.port === data.port)) {
-            results.push({
-              name: `${data.hostname || data.ip} (VIP)`,
-              host: data.vip,
-              port: data.port || 8088,
-              stats: data.stats || { total: 0, connected: 0, disabled: 0 },
-            });
+          // 虚拟IP(VIP)也加入同一组
+          if (data.vip) {
+            const g = groups.get(key);
+            if (!g.ips.includes(data.vip)) g.ips.push(data.vip);
           }
         }
       } catch { /* 忽略无法解析的包 */ }
@@ -73,15 +78,13 @@ export function searchNodes(hubPort) {
 
     socket.bind(DISCOVERY_PORT, () => {
       socket.setBroadcast(true);
-      // 发送广播
       socket.send(DISCOVERY_MSG, 0, DISCOVERY_MSG.length, DISCOVERY_PORT, '255.255.255.255');
       logger.info('已发送 UDP 发现广播');
     });
 
-    // 超时后返回结果
     setTimeout(() => {
       socket.close();
-      resolve(results);
+      resolve([...groups.values()]);
     }, TIMEOUT);
   });
 }
