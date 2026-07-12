@@ -3,12 +3,12 @@
  */
 import logger from './logger.js';
 
-const POLL_INTERVAL = 10000; // 10 秒轮询一次
+const POLL_INTERVAL = 10000;
 
 class NodePoller {
   constructor() {
     this.timer = null;
-    this.nodeStates = new Map(); // nodeId → { status, clients, system, lastSeen }
+    this.nodeStates = new Map();
     this.listeners = new Set();
   }
 
@@ -21,52 +21,94 @@ class NodePoller {
     this.listeners.forEach((fn) => { try { fn(data); } catch {} });
   }
 
-  async pollNode(node) {
+  async pollHost(host, port) {
     const start = Date.now();
+    const [clientsRes, systemRes] = await Promise.all([
+      fetch(`http://${host}:${port}/api/clients`),
+      fetch(`http://${host}:${port}/api/system`),
+    ]);
+    if (!clientsRes.ok) throw new Error(`HTTP ${clientsRes.status}`);
+    if (!systemRes.ok) throw new Error(`HTTP ${systemRes.status}`);
+    const clients = await clientsRes.json();
+    const system = await systemRes.json();
+    const stats = {
+      total: clients.length,
+      connected: clients.filter((c) => c.runtime?.status === 'connected').length,
+      disabled: clients.filter((c) => !c.enabled).length,
+      errors: clients.filter((c) => !c.enabled || (c.runtime?.stats?.errors || 0) > 0).length,
+      notForwarded: clients.reduce((s, c) => s + (c.runtime?.stats?.notForwarded || 0), 0),
+    };
+    return { clients, system, stats, latency: Date.now() - start };
+  }
+
+  async pollNode(node) {
     try {
-      const [clientsRes, systemRes] = await Promise.all([
-        fetch(`http://${node.host}:${node.port}/api/clients`),
-        fetch(`http://${node.host}:${node.port}/api/system`),
-      ]);
-
-      if (!clientsRes.ok) throw new Error(`HTTP ${clientsRes.status}`);
-      if (!systemRes.ok) throw new Error(`HTTP ${systemRes.status}`);
-
-      const clients = await clientsRes.json();
-      const system = await systemRes.json();
-
-      const stats = {
-        total: clients.length,
-        connected: clients.filter((c) => c.runtime?.status === 'connected').length,
-        disabled: clients.filter((c) => !c.enabled).length,
-        errors: clients.filter((c) => !c.enabled || (c.runtime?.stats?.errors || 0) > 0).length,
-        notForwarded: clients.reduce((s, c) => s + (c.runtime?.stats?.notForwarded || 0), 0),
-      };
-
-      this.nodeStates.set(node.id, {
-        nodeId: node.id,
-        nodeName: node.name,
-        nodeHost: node.host,
-        nodePort: node.port,
-        status: 'online',
-        clients,
-        system,
-        stats,
-        version: this.nodeStates.get(node.id)?.version || null,
-        vip: this.nodeStates.get(node.id)?.vip || null,
-        lastSeen: new Date().toISOString(),
-        latency: Date.now() - start,
-      });
+      // 多IP节点：轮询所有host
+      if (node.hosts && node.hosts.length > 0) {
+        const results = await Promise.allSettled(
+          node.hosts.map((h) => this.pollHost(h.host, h.port)),
+        );
+        const hostStates = node.hosts.map((h, i) => {
+          const r = results[i];
+          return r.status === 'fulfilled'
+            ? { host: h.host, port: h.port, label: h.label || null, status: 'online', ...r.value, lastSeen: new Date().toISOString() }
+            : { host: h.host, port: h.port, label: h.label || null, status: 'offline', clients: [], system: null, stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 }, lastError: r.reason?.message, lastSeen: null, latency: 0 };
+        });
+        const onlineAny = hostStates.some((hs) => hs.status === 'online');
+        // 聚合所有在线host的数据
+        const onlineHosts = hostStates.filter((hs) => hs.status === 'online');
+        const aggStats = {
+          total: onlineHosts.reduce((s, h) => s + h.stats.total, 0),
+          connected: onlineHosts.reduce((s, h) => s + h.stats.connected, 0),
+          disabled: onlineHosts.reduce((s, h) => s + h.stats.disabled, 0),
+          errors: onlineHosts.reduce((s, h) => s + h.stats.errors, 0),
+          notForwarded: onlineHosts.reduce((s, h) => s + h.stats.notForwarded, 0),
+        };
+        this.nodeStates.set(node.id, {
+          nodeId: node.id,
+          nodeName: node.name,
+          nodeHost: node.host,
+          nodePort: node.port,
+          hosts: node.hosts,
+          status: onlineAny ? 'online' : 'offline',
+          hostStates,
+          clients: onlineHosts[0]?.clients || [],
+          system: onlineHosts[0]?.system || null,
+          stats: aggStats,
+          version: this.nodeStates.get(node.id)?.version || null,
+          vip: this.nodeStates.get(node.id)?.vip || null,
+          lastSeen: new Date().toISOString(),
+          latency: onlineHosts[0]?.latency || 0,
+        });
+      } else {
+        // 单IP：原有逻辑
+        const result = await this.pollHost(node.host, node.port);
+        this.nodeStates.set(node.id, {
+          nodeId: node.id,
+          nodeName: node.name,
+          nodeHost: node.host,
+          nodePort: node.port,
+          status: 'online',
+          ...result,
+          version: this.nodeStates.get(node.id)?.version || null,
+          vip: this.nodeStates.get(node.id)?.vip || null,
+          lastSeen: new Date().toISOString(),
+        });
+      }
     } catch (err) {
       this.nodeStates.set(node.id, {
         nodeId: node.id,
         nodeName: node.name,
         nodeHost: node.host,
         nodePort: node.port,
+        hosts: node.hosts,
         status: 'offline',
+        hostStates: node.hosts
+          ? node.hosts.map((h) => ({ host: h.host, port: h.port, label: h.label || null, status: 'offline', clients: [], system: null, stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 }, lastError: err.message, lastSeen: null, latency: 0 }))
+          : [],
         clients: [],
         system: null,
-        stats: { total: 0, connected: 0, disabled: 0, errors: 0 },
+        stats: { total: 0, connected: 0, disabled: 0, errors: 0, notForwarded: 0 },
         version: this.nodeStates.get(node.id)?.version || null,
         vip: this.nodeStates.get(node.id)?.vip || null,
         lastError: err.message,
@@ -81,14 +123,12 @@ class NodePoller {
     });
   }
 
-  /**
-   * 处理客户端心跳上报
-   */
   handleHeartbeat(data) {
-    // 通过 host:port 查找对应的节点状态
     for (const [nodeId, state] of this.nodeStates) {
       if (state.nodeHost === data.host && state.nodePort === data.port) {
-        this.nodeStates.set(nodeId, {
+        const now = new Date().toISOString();
+        // 更新整个节点状态
+        const update = {
           ...state,
           status: 'online',
           stats: data.stats || state.stats,
@@ -96,15 +136,28 @@ class NodePoller {
           clients: data.clients || state.clients,
           version: data.version || state.version,
           vip: data.vip || state.vip,
-          lastSeen: new Date().toISOString(),
-          lastHeartbeat: new Date().toISOString(),
+          lastSeen: now,
+          lastHeartbeat: now,
           latency: 0,
-        });
-
-        this._emit({
-          type: 'node:update',
-          data: this.nodeStates.get(nodeId),
-        });
+        };
+        // 如果存在hostStates，更新对应host的心跳
+        if (Array.isArray(update.hostStates)) {
+          const idx = update.hostStates.findIndex((hs) => hs.host === data.host && hs.port === data.port);
+          if (idx >= 0) {
+            update.hostStates[idx] = {
+              ...update.hostStates[idx],
+              status: 'online',
+              stats: data.stats || update.hostStates[idx].stats,
+              system: data.system || update.hostStates[idx].system,
+              clients: data.clients || update.hostStates[idx].clients,
+              lastSeen: now,
+              lastHeartbeat: now,
+              latency: 0,
+            };
+          }
+        }
+        this.nodeStates.set(nodeId, update);
+        this._emit({ type: 'node:update', data: this.nodeStates.get(nodeId) });
         return true;
       }
     }
@@ -115,19 +168,12 @@ class NodePoller {
     await Promise.allSettled(nodes.map((n) => this.pollNode(n)));
   }
 
-  /**
-   * 添加新节点到轮询列表并立即轮询一次
-   */
   async addNode(node) {
     await this.pollNode(node);
-    // 保存当前节点列表以便后续轮询使用
     if (!this._nodes) this._nodes = [];
     this._nodes.push(node);
   }
 
-  /**
-   * 从轮询列表中移除节点
-   */
   removeNode(nodeId) {
     this.nodeStates.delete(nodeId);
     if (this._nodes) {

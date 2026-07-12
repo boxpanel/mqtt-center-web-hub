@@ -269,7 +269,6 @@ export default function App() {
                             <th style={{ width: 50, textAlign: 'center' }}>数量</th>
                             <th style={{ textAlign: 'center' }}>节点名称</th>
                             <th style={{ textAlign: 'center' }}>IP 地址</th>
-                            <th style={{ textAlign: 'center' }}>端口</th>
                             <th style={{ textAlign: 'center' }}>连接状态</th>
                             <th style={{ textAlign: 'center' }}>节点在线数</th>
                             <th style={{ textAlign: 'center' }}>禁用数量</th>
@@ -283,27 +282,49 @@ export default function App() {
                           {nodes.map((node, i) => {
                             const state = nodeStates.find((s) => s.nodeId === node.id);
                             const isOnline = state?.status === 'online';
+                            // 多IP节点：每个host独立一行
+                            const hostRows = state?.hostStates || (node.hosts ? node.hosts.map((h) => ({ ...h, status: isOnline ? 'online' : 'offline', stats: { total: 0, connected: 0, disabled: 0, notForwarded: 0 } })) : null);
+                            if (hostRows && hostRows.length > 1) {
+                              const span = hostRows.length;
+                              // 分组显示
+                              return hostRows.map((hs, j) => (
+                                <tr key={`${node.id}-${j}`} style={{ background: j % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                                  {j === 0 ? <td rowSpan={span} style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)' }}>{i + 1}</td> : null}
+                                  {j === 0 ? <td rowSpan={span} style={{ fontWeight: 600, textAlign: 'center', verticalAlign: 'middle' }}>{node.name}</td> : null}
+                                  <td style={{ textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                                      {hs.label ? <span style={{ fontSize: 10, color: '#fff', background: hs.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{hs.label}</span> : null}
+                                      <code style={{ cursor: hs.status === 'online' ? 'pointer' : 'default' }} onDoubleClick={() => { if (hs.status === 'online') window.open(`http://${hs.host}:${hs.port}`, '_blank'); }}>{hs.host}</code>
+                                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{hs.port}</span>
+                                    </div>
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <span className={`node-dot ${hs.status === 'online' ? 'online' : 'offline'}`} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />
+                                    {hs.status === 'online' ? '在线' : '离线'}
+                                  </td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--success)' }}>{hs.stats?.connected || 0}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--danger)' }}>{hs.stats?.disabled || 0}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{hs.stats?.total || 0}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--warning)' }}>{hs.stats?.notForwarded || 0}</td>
+                                  <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>{j === 0 ? (state?.version || '-') : ''}</td>
+                                  {j === 0 ? <td rowSpan={span} style={{ whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                                    <button className="btn btn-sm btn-primary" style={{ marginRight: 4 }} onClick={() => handleEditNode(node)}>修改</button>
+                                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteNode(node.id)}>删除</button>
+                                  </td> : null}
+                                </tr>
+                              ));
+                            }
+                            // 单IP显示
                             return (
                               <tr key={node.id}>
                                 <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)' }}>{i + 1}</td>
                                 <td style={{ fontWeight: 600, textAlign: 'center' }}>{node.name}</td>
                                 <td style={{ textAlign: 'center' }}>
-                                  {node.hosts ? (
-                                    node.hosts.map((h, j) => (
-                                      <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                                        {h.label ? <span style={{ fontSize: 10, color: '#fff', background: h.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{h.label}</span> : null}
-                                        <code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${h.host}:${h.port}`, '_blank'); }}>{h.host}</code>
-                                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{h.port}</span>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                                      <code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${node.host}:${node.port}`, '_blank'); }}>{node.host}</code>
-                                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{node.port}</span>
-                                    </div>
-                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                                    <code style={{ cursor: isOnline ? 'pointer' : 'default' }} onDoubleClick={() => { if (isOnline) window.open(`http://${node.host}:${node.port}`, '_blank'); }}>{node.host}</code>
+                                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{node.port}</span>
+                                  </div>
                                 </td>
-                                <td style={{ textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>{node.hosts ? node.hosts.map((h) => h.port).join('/') : node.port}</td>
                                 <td style={{ textAlign: 'center' }}>
                                   <span className={`node-dot ${isOnline ? 'online' : 'offline'}`} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />
                                   {isOnline ? '在线' : '离线'}
