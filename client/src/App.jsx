@@ -187,8 +187,13 @@ export default function App() {
     setDiscoveredNodes([]);
     setSelectedDiscovered(new Set());
     try {
-      const nodes = await searchNodes();
-      setDiscoveredNodes(nodes);
+      const result = await searchNodes();
+      // 过滤掉已添加到节点列表中的节点
+      const existingSet = new Set(nodes.map((n) => `${n.host}:${n.port}`));
+      const filtered = result.filter((group) =>
+        !group.items.every((item) => existingSet.has(`${item.ip}:${item.port}`))
+      );
+      setDiscoveredNodes(filtered);
       // 不默认勾选
     } catch (err) {
       showToast(err.message, true);
