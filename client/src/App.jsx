@@ -294,7 +294,15 @@ export default function App() {
                                   <td style={{ textAlign: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
                                       {hs.label ? <span style={{ fontSize: 10, color: '#fff', background: hs.label === '虚' ? 'var(--warning)' : 'var(--primary)', borderRadius: 4, padding: '0 5px', lineHeight: '16px', fontWeight: 600 }}>{hs.label}</span> : null}
-                                      <code style={{ cursor: 'pointer' }} onDoubleClick={() => window.open(`http://${hs.host}:${hs.port}`, '_blank')}>{hs.host}</code>
+                                      <code style={{ cursor: 'pointer' }} onDoubleClick={() => {
+                                        if (hs.isVirtual && state?.hostStates) {
+                                          // VIP双击：跳转到当前持有VIP的真实服务器
+                                          const active = state.hostStates.find((h) => !h.isVirtual && h.status === 'online');
+                                          if (active) window.open(`http://${active.host}:${active.port}`, '_blank');
+                                        } else {
+                                          window.open(`http://${hs.host}:${hs.port}`, '_blank');
+                                        }
+                                      }}>{hs.host}</code>
                                       {hs.isVirtual ? null : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>:{hs.port}</span>}
                                     </div>
                                   </td>
